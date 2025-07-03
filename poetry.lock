@@ -1129,6 +1129,18 @@ unicode = ["unicodedata2 (>=15.1.0) ; python_version <= \"3.12\""]
 woff = ["brotli (>=1.0.1) ; platform_python_implementation == \"CPython\"", "brotlicffi (>=0.8.0) ; platform_python_implementation != \"CPython\"", "zopfli (>=0.1.4)"]
 
 [[package]]
+name = "freesimplegui"
+version = "5.2.0.post1"
+description = "The free-forever Python GUI framework."
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "freesimplegui-5.2.0.post1-py3-none-any.whl", hash = "sha256:3d61eb519324503232f86b2f1bd7f5c6813ce225f6e189d0fd737ddb036af4d5"},
+    {file = "freesimplegui-5.2.0.post1.tar.gz", hash = "sha256:e58a0e6758e9a9e87152256911f94fcc3998356d1309973a9f4d9df2dc55f98a"},
+]
+
+[[package]]
 name = "frozenlist"
 version = "1.7.0"
 description = "A list-like structure which implements collections.abc.MutableSequence"
@@ -4636,4 +4648,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "5e5f3c865c0df1545c5a1f1a278e5cf252acfd30a887aa0dc8686106d5fce393"
+content-hash = "96b82cb69273278b97941f508102f08f250c88fe93d06bcf93eaf2c8f21d8350"
