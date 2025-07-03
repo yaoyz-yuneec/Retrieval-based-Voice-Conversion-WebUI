@@ -54,7 +54,9 @@ httpx = "^0.27.0"
 fastapi = "0.88"
 torchfcpe = "^0.0.4"
 ffmpy = "0.3.1"
-torch = { path = "/home/unix_ai/local_wheels/torch-2.2.0a0+6a974be.nv23.11-cp310-cp310-linux_aarch64.whl" }
+torch = { path = "/home/unix_ai/local_wheels/torch-2.3.0-cp310-cp310-linux_aarch64.whl" }
+torchaudio = { path = "/home/unix_ai/local_wheels/torchaudio-2.3.0+952ea74-cp310-cp310-linux_aarch64.whl" }
+torchvision = { path = "/home/unix_ai/local_wheels/torchvision-0.18.0a0+6043bc2-cp310-cp310-linux_aarch64.whl" }
 
 [tool.poetry.group.dev.dependencies]
 onnxruntime-gpu = { path = "/home/unix_ai/local_wheels/onnxruntime_gpu-1.19.0-cp310-cp310-linux_aarch64.whl" }
