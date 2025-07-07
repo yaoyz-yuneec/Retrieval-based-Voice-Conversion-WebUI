@@ -297,52 +297,98 @@ class WebRTCRVC:
     async def start_stream(self):
         """启动 WebRTC 和 PulseAudio 流"""
         self.stream_active = True
-        self.pc = RTCPeerConnection()
+        # 配置 ICE 服务器
+        ice_servers = [
+            RTCIceServer(urls="stun:stun.l.google.com:19302"),
+            # 可添加 TURN 服务器
+        ]
+        self.pc = RTCPeerConnection(iceServers=ice_servers)
         self.pc.addTrack(self.audio_track)
+
+        @self.pc.on("track")
+        async def on_track(track):
+            if track.kind == "audio":
+                async def receive_audio():
+                    while self.stream_active:
+                        try:
+                            frame = await track.recv()
+                            self.audio_track.add_audio(frame.to_ndarray().tobytes())
+                        except Exception as e:
+                            print(f"Error receiving audio frame: {e}")
+                            break
+                asyncio.ensure_future(receive_audio())
+
+        @self.pc.on("connectionstatechange")
+        async def on_connectionstatechange():
+            print(f"Connection state: {self.pc.connectionState}")
+            if self.pc.connectionState == "failed":
+                self.stream_active = False
 
         async with PulseAsync('rvc-client') as pulse:
             # 创建 PulseAudio 播放流
             sink = await pulse.sink_input_new(
-                sink_name=None,  # 使用默认接收器
+                sink_name=None,
                 stream_name='rvc-output',
                 rate=self.audio_config.samplerate,
                 channels=self.audio_config.channels,
                 format='float32le'
             )
 
-            # WebRTC 信令
             async with websockets.connect(self.signaling_server) as websocket:
                 # 创建并发送 offer
-                await self.pc.setLocalDescription(await self.pc.createOffer())
-                await websocket.send(json.dumps({"sdp": self.pc.localDescription.sdp, "type": self.pc.localDescription.type}))
+                try:
+                    await self.pc.setLocalDescription(await self.pc.createOffer())
+                    await websocket.send(json.dumps({
+                        "type": "offer",
+                        "sdp": self.pc.localDescription.sdp
+                    }))
+                except Exception as e:
+                    print(f"Error sending offer: {e}")
+                    return
 
                 # 接收 answer
-                response = json.loads(await websocket.recv())
-                await self.pc.setRemoteDescription(RTCSessionDescription(sdp=response["sdp"], type=response["type"]))
+                try:
+                    response = json.loads(await asyncio.wait_for(websocket.recv(), timeout=10))
+                    if response.get("type") != "answer":
+                        raise ValueError("Expected SDP answer")
+                    await self.pc.setRemoteDescription(RTCSessionDescription(sdp=response["sdp"], type=response["type"]))
+                except Exception as e:
+                    print(f"Error receiving answer: {e}")
+                    return
 
                 # 处理 ICE 候选者
                 async def handle_ice():
-                    while True:
-                        candidate = await websocket.recv()
-                        candidate = json.loads(candidate)
-                        if candidate:
-                            await self.pc.addIceCandidate(candidate)
-
-                # 模拟接收音频数据（实际由服务端发送）
-                async def simulate_audio():
-                    # 假设服务端发送 PCM 数据
                     while self.stream_active:
-                        # 示例：模拟从服务端接收的音频数据
-                        # 替换为实际从 WebRTC 数据通道或媒体流接收的逻辑
-                        data = np.random.randn(self.block_frame * self.audio_config.channels).astype(np.float32).tobytes()
-                        self.audio_track.add_audio(data)
-                        await asyncio.sleep(self.audio_config.block_time)
+                        try:
+                            message = json.loads(await asyncio.wait_for(websocket.recv(), timeout=30))
+                            if message.get("type") == "candidate" and message.get("candidate"):
+                                await self.pc.addIceCandidate(RTCSessionDescription(
+                                    sdp=message["candidate"],
+                                    type="candidate",
+                                    sdpMid=message["sdpMid"],
+                                    sdpMLineIndex=message["sdpMLineIndex"]
+                                ))
+                        except asyncio.TimeoutError:
+                            print("No ICE candidates received, closing connection")
+                            break
+                        except Exception as e:
+                            print(f"Error processing ICE candidate: {e}")
+                            break
 
-                # 启动音频处理和 ICE 候选者处理
+                # 发送 ICE 候选者
+                @self.pc.on("icecandidate")
+                async def on_icecandidate(candidate):
+                    if candidate:
+                        await websocket.send(json.dumps({
+                            "type": "candidate",
+                            "candidate": candidate.sdp,
+                            "sdpMid": candidate.sdpMid,
+                            "sdpMLineIndex": candidate.sdpMLineIndex
+                        }))
+
                 await asyncio.gather(
                     self.audio_callback(pulse, sink),
-                    handle_ice(),
-                    simulate_audio()
+                    handle_ice()
                 )
 
     async def stop_stream(self):
